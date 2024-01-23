@@ -4,7 +4,8 @@ import websocket
 
 class KafkaProducer:
     def __init__(self, bootstrap_servers):
-        self.producer = Producer({'bootstrap.servers': bootstrap_servers})
+        producer_conf = {'bootstrap.servers': bootstrap_servers, 'client.id': 'eth_price_producer'}
+        self.producer = Producer(producer_conf)
 
     def produce(self, topic, key, value):
         self.producer.produce(topic, key=key, value=value)
@@ -22,6 +23,7 @@ class WebSocketProducer:
     def on_message(self, ws, message):
         try:
             data = json.loads(message)
+            print(data)
             product_id = data.get('product_id')
 
             if product_id in ["ETH-BTC", "ETH-USD"]:

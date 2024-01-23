@@ -1,5 +1,4 @@
-from websocket_producer import WebSocketProducer
-from kafka_producer import KafkaProducer
+from producer import WebSocketProducer, KafkaProducer
 
 if __name__ == "__main__":
     # Define configurations
@@ -16,7 +15,7 @@ if __name__ == "__main__":
             }
         ]
     }
-    kafka_bootstrap_servers = 'kafka_bootstrap_servers'  # Replace with your Kafka bootstrap servers
+    kafka_bootstrap_servers = 'localhost:29092'  # Replace with your Kafka bootstrap servers
 
     # Initialize Kafka producer
     kafka_producer = KafkaProducer(bootstrap_servers=kafka_bootstrap_servers)
