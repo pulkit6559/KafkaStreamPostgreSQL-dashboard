@@ -16,16 +16,22 @@ class KafkaConsumer:
     def connect_to_postgres(self):
         return psycopg2.connect(self.postgres_connection_string)
 
-    # def create_table_if_not_exists(self, cursor):
-    #     create_table_query = """
-    #     CREATE TABLE IF NOT EXISTS coinbase_data (
-    #         id SERIAL PRIMARY KEY,
-    #         product_id VARCHAR(50),
-    #         -- Add other columns as needed
-    #         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    #     );
-    #     """
-    #     cursor.execute(create_table_query)
+    def create_table_if_not_exists(self, postgres_conn, cursor, topic):
+        print(topic)
+        create_table_query = f"""
+        -- DROP TABLE IF EXISTS {topic}_data;
+        
+        CREATE TABLE IF NOT EXISTS {topic}_data (
+            id SERIAL PRIMARY KEY,
+            signal VARCHAR(10) NOT NULL,
+            timestamp TIMESTAMPTZ NOT NULL,
+            price FLOAT(1)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_stock_data_timestamp_symbol ON {topic}_data (timestamp, signal);
+        """
+        cursor.execute(create_table_query)
+        postgres_conn.commit()
 
     def consume_and_store(self):
         self.consumer.subscribe([self.kafka_topic])
@@ -34,8 +40,13 @@ class KafkaConsumer:
         postgres_conn = self.connect_to_postgres()
         cursor = postgres_conn.cursor()
 
+        topic = self.kafka_topic.replace("-","_").lower().replace("_topic", "")
         # # Create table if not exists
-        # self.create_table_if_not_exists(cursor)
+        self.create_table_if_not_exists(postgres_conn, cursor, topic)
+        
+        cursor.execute(f"""SELECT * FROM {topic}_data;""")
+        result = cursor.fetchall()
+        print([row for row in result])
 
         try:
             while True:
@@ -52,8 +63,11 @@ class KafkaConsumer:
                         break
 
                 # Process the message and store it in PostgreSQL
-                print(msg.value().decode('utf-8'))
-                # self.process_and_store_message(msg.value().decode('utf-8'), cursor, postgres_conn)
+                # print(msg.value().decode('utf-8'))
+                self.process_and_store_message(msg.value().decode('utf-8'), cursor, postgres_conn)
+                cursor.execute(f"""SELECT * FROM {topic}_data;""")
+                result = cursor.fetchall()
+                print([row for row in result])
         except KeyboardInterrupt:
             pass
         finally:
@@ -61,25 +75,29 @@ class KafkaConsumer:
             cursor.close()
             postgres_conn.close()
 
-    # def process_and_store_message(self, message, cursor, postgres_conn):
-    #     # Parse JSON message
-    #     data = json.loads(message)
+    def process_and_store_message(self, message, cursor, postgres_conn):
+        # Parse JSON message
+        data = json.loads(message)
 
-    #     print(data)
-    # # Extract data fields as needed
-    # product_id = data.get('product_id')
-    # # Extract other fields...
+        print(data)
+        # Extract data fields as needed
+        product_id = data.get('product_id').replace("-","_").lower()
+        signal = data.get('side')
+        timestamp = data.get('time')
+        price = data.get('price')
+        
+        # Extract other fields...
 
-    # # Insert data into PostgreSQL
-    # insert_query = sql.SQL("""
-    #     INSERT INTO coinbase_data (product_id, timestamp)
-    #     VALUES (%s, %s);
-    # """)
+        # Insert data into PostgreSQL
+        insert_query = sql.SQL(f"""
+            INSERT INTO coinbase_{product_id}_data (signal, timestamp, price)
+            VALUES (%s, %s, %s);
+        """)
 
-    # cursor.execute(insert_query, (product_id,))
+        cursor.execute(insert_query, (signal, timestamp, price))
 
-    # # Commit the transaction
-    # postgres_conn.commit()
+        # Commit the transaction
+        postgres_conn.commit()
 
 
 if __name__ == "__main__":

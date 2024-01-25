@@ -23,7 +23,7 @@ class WebSocketProducer:
     def on_message(self, ws, message):
         try:
             data = json.loads(message)
-            print(data)
+            # print(data)
             product_id = data.get('product_id')
 
             if product_id in ["ETH-BTC", "ETH-USD"]:
